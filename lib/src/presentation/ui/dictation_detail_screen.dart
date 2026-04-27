@@ -154,13 +154,11 @@ class DictationDetailScreen extends ConsumerWidget {
         audioPlayerState.playerState == PlayerState.stopped ||
         !isPlayingThisDictation;
 
-    IconData mainButtonIcon;
+    IconData mainButtonIcon = Icons.play_arrow;
     if (isPlaying) {
       mainButtonIcon = Icons.pause_circle_filled;
     } else if (isPaused) {
       mainButtonIcon = Icons.play_circle_filled;
-    } else {
-      mainButtonIcon = Icons.play_arrow;
     }
 
     final int totalRecordings = dictation.recordings.length;

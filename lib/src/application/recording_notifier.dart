@@ -22,12 +22,12 @@ class RecordingNotifier extends Notifier<RecordingState> {
     try {
       // Check if permission is already granted
       var hasPermission = await audioService.hasRecordingPermission();
-      
+
       // If not granted, request permission
       if (!hasPermission) {
         hasPermission = await audioService.requestRecordingPermission();
       }
-      
+
       // If still no permission, throw error
       if (!hasPermission) {
         state = state.copyWith(
@@ -38,7 +38,7 @@ class RecordingNotifier extends Notifier<RecordingState> {
       }
 
       final path = await audioService.getRecordingFilePath();
-      
+
       // Start recording
       await audioService.startRecording(path);
 

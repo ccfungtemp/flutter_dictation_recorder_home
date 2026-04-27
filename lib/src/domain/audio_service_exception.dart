@@ -5,5 +5,6 @@ class AudioServiceException implements Exception {
   final Object? cause;
 
   @override
-  String toString() => 'AudioServiceException: $message${cause != null ? ' (cause: $cause)' : ''}';
+  String toString() =>
+      'AudioServiceException: $message${cause != null ? ' (cause: $cause)' : ''}';
 }

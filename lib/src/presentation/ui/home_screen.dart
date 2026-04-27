@@ -26,33 +26,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: Center(
               child: DropdownButton<String?>(
                 value: _selectedCategory,
-                hint: const Text(
-                  '全部類別',
-                  style: TextStyle(fontSize: 12),
-                ),
+                hint: const Text('全部類別', style: TextStyle(fontSize: 12)),
                 items: [
                   const DropdownMenuItem(
-                    child: Text(
-                      '全部類別',
-                      style: TextStyle(fontSize: 12),
-                    ),
+                    child: Text('全部類別', style: TextStyle(fontSize: 12)),
                   ),
-                  ...dictationsAsync.maybeWhen(
-                    data: (dictations) => dictations
-                        .map((d) => d.categoryName)
-                        .toSet()
-                        .toList()
-                        ..sort(),
-                    orElse: () => <String>[],
-                  ).map(
-                    (category) => DropdownMenuItem<String?>(
-                      value: category,
-                      child: Text(
-                        category,
-                        style: const TextStyle(fontSize: 12),
+                  ...dictationsAsync
+                      .maybeWhen(
+                        data: (dictations) =>
+                            dictations
+                                .map((d) => d.categoryName)
+                                .toSet()
+                                .toList()
+                              ..sort(),
+                        orElse: () => <String>[],
+                      )
+                      .map(
+                        (category) => DropdownMenuItem<String?>(
+                          value: category,
+                          child: Text(
+                            category,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
                 ],
                 onChanged: (value) {
                   setState(() {

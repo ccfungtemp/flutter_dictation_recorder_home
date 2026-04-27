@@ -19,26 +19,59 @@ class AudioPlayerNotifier extends Notifier<AudioPlayerState> {
         // Handle playback completion
         if (playerState == PlayerState.completed) {
           developer.log('AudioPlayerNotifier: Detected PlayerState.completed');
-          // Update player state first
-          state = state.copyWith(playerState: playerState);
-          // If in sequential playing mode, all recordings have been played
-          if (state.isSequentialPlaying) {
-            developer.log('AudioPlayerNotifier: Sequential playback completed');
-            state = state.copyWith(
-              playerState: PlayerState.stopped,
-              playingFilePath: null,
-              currentDictationId: null,
-              currentRecordingIndex: null,
-              isSequentialPlaying: false,
+          // Briefly update state to completed. UI might reflect this momentarily.
+          state = state.copyWith(playerState: PlayerState.completed);
+
+          // Check if we are in sequential playback mode and if there are more recordings.
+          if (state.isSequentialPlaying &&
+              state.currentDictationId != null &&
+              state.currentRecordingIndex != null) {
+            final dictations = ref.read(dictationsNotifierProvider).value;
+            final currentDictation = dictations?.firstWhereOrNull(
+              (d) => d.id == state.currentDictationId,
             );
-          } else if (!state.isSequentialPlaying) {
-            // Single recording completed, stop
-            state = state.copyWith(
-              playerState: PlayerState.stopped,
-              playingFilePath: null,
-              currentDictationId: null,
-              currentRecordingIndex: null,
+
+            if (currentDictation != null) {
+              final nextIndex = state.currentRecordingIndex! + 1;
+              if (nextIndex < currentDictation.recordings.length) {
+                developer.log(
+                  'AudioPlayerNotifier: Sequential playback detected. Triggering playNext.',
+                );
+                // Trigger playing the next track asynchronously.
+                // This allows the stream listener to complete its current execution.
+                Future.delayed(Duration.zero, () async {
+                  try {
+                    // playNext() will handle updating the state to playing and advancing the index.
+                    await playNext();
+                  } catch (e) {
+                    developer.log(
+                      'AudioPlayerNotifier: Error auto-playing next track: $e',
+                    );
+                    await stop(); // If an error occurs, stop playback.
+                  }
+                });
+                // Do NOT set playerState to stopped here. 'playNext' will handle state updates.
+                // The state will be 'completed' briefly, then `playNext` will attempt to set it to 'playing'.
+              } else {
+                // This was the last track in the sequence. Stop playback.
+                developer.log(
+                  'AudioPlayerNotifier: Sequential playback completed (last track). Stopping.',
+                );
+                await stop(); // This will set state to PlayerState.stopped.
+              }
+            } else {
+              // Dictation not found, stop playback.
+              developer.log(
+                'AudioPlayerNotifier: Dictation not found while handling completed event. Stopping.',
+              );
+              await stop();
+            }
+          } else {
+            // Not in sequential playing mode, or no dictation/index info available. Stop playback.
+            developer.log(
+              'AudioPlayerNotifier: Playback completed, not sequential. Stopping.',
             );
+            await stop();
           }
         } else if (playerState == PlayerState.stopped) {
           developer.log('AudioPlayerNotifier: Detected PlayerState.stopped');
@@ -56,7 +89,7 @@ class AudioPlayerNotifier extends Notifier<AudioPlayerState> {
         }
       } catch (e, stackTrace) {
         developer.log(
-          'AudioPlayerNotifier: Error in playerStateStream listener: $e\n$stackTrace',
+          'AudioPlayerNotifier: Error in playerStateStream listener: $e$stackTrace',
         );
         state = state.copyWith(
           playerState: PlayerState.stopped,
@@ -91,7 +124,7 @@ class AudioPlayerNotifier extends Notifier<AudioPlayerState> {
       await _audioService.playRecording(filePath);
     } catch (e, stackTrace) {
       developer.log(
-        'AudioPlayerNotifier: Error in _playRecording: $e\n$stackTrace',
+        'AudioPlayerNotifier: Error in _playRecording: $e$stackTrace',
       );
       // 播放失敗時停止並重置狀態
       state = state.copyWith(
@@ -148,7 +181,7 @@ class AudioPlayerNotifier extends Notifier<AudioPlayerState> {
       }
     } catch (e, stackTrace) {
       developer.log(
-        'AudioPlayerNotifier: Error in playAllRecordingsSimple: $e\n$stackTrace',
+        'AudioPlayerNotifier: Error in playAllRecordingsSimple: $e$stackTrace',
       );
       state = state.copyWith(
         playerState: PlayerState.stopped,

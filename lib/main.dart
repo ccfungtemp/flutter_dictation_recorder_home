@@ -17,15 +17,16 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         brightness: Brightness.dark,
         primarySwatch: Colors.blue,
-        scaffoldBackgroundColor: Colors.black, // Set scaffold background to black
+        scaffoldBackgroundColor:
+            Colors.black, // Set scaffold background to black
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.black, // Set app bar background to black
           foregroundColor: Colors.white, // Set app bar text/icon color to white
         ),
         textTheme: Theme.of(context).textTheme.apply(
-              bodyColor: Colors.white, // Set default text color to white
-              displayColor: Colors.white,
-            ),
+          bodyColor: Colors.white, // Set default text color to white
+          displayColor: Colors.white,
+        ),
         visualDensity: VisualDensity.adaptivePlatformDensity,
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.blue,
