@@ -26,10 +26,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: Center(
               child: DropdownButton<String?>(
                 value: _selectedCategory,
-                hint: const Text('全部類別', style: TextStyle(fontSize: 12)),
+                hint: const Text('全部類別', style: TextStyle(fontSize: 13)),
                 items: [
-                  const DropdownMenuItem(
-                    child: Text('全部類別', style: TextStyle(fontSize: 12)),
+                  DropdownMenuItem(
+                    child: Text(
+                      '全部類別',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.yellow.shade600,
+                      ),
+                    ),
                   ),
                   ...dictationsAsync
                       .maybeWhen(
@@ -46,7 +52,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           value: category,
                           child: Text(
                             category,
-                            style: const TextStyle(fontSize: 12),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.yellow.shade600,
+                            ),
                           ),
                         ),
                       ),
@@ -102,7 +111,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           Text(
                             dictation.categoryName,
                             style: const TextStyle(
-                              fontSize: 14,
+                              fontSize: 16,
                               color: Color(0xFFD8A9E8),
                             ),
                           ),

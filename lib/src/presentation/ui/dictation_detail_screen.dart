@@ -52,13 +52,15 @@ class DictationDetailScreen extends ConsumerWidget {
                 children: [
                   Text(
                     dictation.textbookName,
-                    style: Theme.of(context).textTheme.headlineMedium,
+                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                      color: const Color(0xFFD8A9E8),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     dictation.categoryName,
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: const Color(0xFFD8A9E8),
+                      color: Colors.yellow.shade800,
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -78,7 +80,10 @@ class DictationDetailScreen extends ConsumerWidget {
                             audioPlayerState.playerState == PlayerState.paused;
 
                         return ListTile(
-                          leading: CircleAvatar(child: Text('${index + 1}')),
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.purple.shade300,
+                            child: Text('${index + 1}'),
+                          ),
                           title: Text('錄音 ${index + 1}'),
                           subtitle: Text(
                             '長度: ${recording.durationSeconds} 秒${isCurrent ? (isPlaying ? ' (播放中)' : ' (已暫停)') : ''}',

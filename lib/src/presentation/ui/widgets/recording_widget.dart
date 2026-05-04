@@ -42,7 +42,7 @@ class RecordingWidget extends ConsumerWidget {
         const SizedBox(height: 8),
         GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTapDown: (details) async {
+          onLongPressStart: (details) async {
             // Hide keyboard when button is pressed
             FocusScope.of(context).unfocus();
             // Only start if not already recording
@@ -50,7 +50,7 @@ class RecordingWidget extends ConsumerWidget {
               await recordingNotifier.startRecording();
             }
           },
-          onTapUp: (details) async {
+          onLongPressEnd: (details) async {
             // Stop recording when button is released (only if actually recording)
             if (recordingState.isRecording) {
               final recording = await recordingNotifier.stopRecording();
@@ -59,8 +59,8 @@ class RecordingWidget extends ConsumerWidget {
               }
             }
           },
-          onTapCancel: () async {
-            // Stop recording if tap is cancelled (only if actually recording)
+          onLongPressCancel: () async {
+            // Stop recording if long press is cancelled (only if actually recording)
             if (recordingState.isRecording) {
               await recordingNotifier.stopRecording();
             }

@@ -209,8 +209,12 @@ class RecordAudioService implements AudioService {
   @override
   Future<String> getRecordingFilePath() async {
     final directory = await getApplicationDocumentsDirectory();
+    final audioDir = Directory('${directory.path}/audio');
+    if (!await audioDir.exists()) {
+      await audioDir.create(recursive: true);
+    }
     final String uuid = _uuid.v4();
-    return '${directory.path}/$uuid.m4a'; // Using m4a for good quality and small size
+    return '${audioDir.path}/$uuid.m4a'; // Using m4a for good quality and small size
   }
 
   void dispose() {

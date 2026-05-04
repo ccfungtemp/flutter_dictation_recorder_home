@@ -11,12 +11,14 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const String myFontFamily = 'NotoSansTC';
     return MaterialApp.router(
       routerConfig: router,
       title: '默書錄音',
       theme: ThemeData(
         brightness: Brightness.dark,
         primarySwatch: Colors.blue,
+        fontFamily: myFontFamily,
         scaffoldBackgroundColor:
             Colors.black, // Set scaffold background to black
         appBarTheme: const AppBarTheme(
@@ -26,6 +28,7 @@ class MyApp extends StatelessWidget {
         textTheme: Theme.of(context).textTheme.apply(
           bodyColor: Colors.white, // Set default text color to white
           displayColor: Colors.white,
+          fontFamily: myFontFamily,
         ),
         visualDensity: VisualDensity.adaptivePlatformDensity,
         colorScheme: ColorScheme.fromSeed(

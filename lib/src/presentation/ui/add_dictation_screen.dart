@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:io';
 import './widgets/recording_widget.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -158,6 +159,46 @@ class _AddDictationScreenState extends ConsumerState<AddDictationScreen> {
     return true;
   }
 
+  String _sanitizeFileName(String input) {
+    return input
+        .replaceAll(RegExp(r'[<>:"\\|?*]'), '')
+        .replaceAll(RegExp(r'\s+'), '');
+  }
+
+  String _buildRecordingKey(
+    String category,
+    String textbook,
+    String recordingName,
+  ) {
+    return '${category}_${textbook}_$recordingName';
+  }
+
+  Future<void> _renameRecordingsToStructuredNames() async {
+    for (int i = 0; i < _recordings.length; i++) {
+      final recording = _recordings[i];
+      final recordingName = recording.name ?? '錄音 ${i + 1}';
+      final newFileName =
+          '${_sanitizeFileName(_categoryNameController.text)}_${_sanitizeFileName(_textbookNameController.text)}_${_sanitizeFileName(recordingName)}.m4a';
+
+      final directory = Directory(recording.filePath).parent;
+      final newPath = '${directory.path}/$newFileName';
+
+      if (recording.filePath == newPath) continue;
+
+      final newFile = File(newPath);
+      if (await newFile.exists() && recording.filePath != newPath) {
+        await newFile.delete();
+      }
+
+      final oldFile = File(recording.filePath);
+      if (await oldFile.exists()) {
+        await oldFile.rename(newPath);
+      }
+
+      _recordings[i] = recording.copyWith(filePath: newPath);
+    }
+  }
+
   Future<bool> _confirmDiscard() async {
     return await showDialog<bool>(
           context: context,
@@ -214,6 +255,9 @@ class _AddDictationScreenState extends ConsumerState<AddDictationScreen> {
         return;
       }
 
+      // 重命名錄音檔案為結構化名稱
+      await _renameRecordingsToStructuredNames();
+
       final dictation = Dictation(
         id: _dictationId,
         textbookName: _textbookNameController.text,
@@ -238,9 +282,32 @@ class _AddDictationScreenState extends ConsumerState<AddDictationScreen> {
     }
   }
 
-  void _onRecordingStopped(Recording recording) {
+  Future<void> _onRecordingStopped(Recording recording) async {
+    // 立即重新命名為 [categoryName]_[textbookName]_[錄音名稱].m4a
+    final recordingName = recording.name ?? '錄音 ${_recordings.length + 1}';
+    final newFileName =
+        '${_sanitizeFileName(_categoryNameController.text)}_${_sanitizeFileName(_textbookNameController.text)}_${_sanitizeFileName(recordingName)}.m4a';
+
+    final oldFile = File(recording.filePath);
+    final audioDir = oldFile.parent;
+    final newPath = '${audioDir.path}/$newFileName';
+
+    String finalPath = recording.filePath;
+    if (await oldFile.exists()) {
+      if (oldFile.path != newPath) {
+        final newFile = File(newPath);
+        if (await newFile.exists()) {
+          await newFile.delete();
+        }
+        await oldFile.rename(newPath);
+        finalPath = newPath;
+      }
+    }
+
+    final updatedRecording = recording.copyWith(filePath: finalPath);
+
     setState(() {
-      _recordings.add(recording);
+      _recordings.add(updatedRecording);
     });
 
     // Scroll to the bottom to show the newly added recording
@@ -375,9 +442,8 @@ class _AddDictationScreenState extends ConsumerState<AddDictationScreen> {
 
   Future<void> _editRecordingName(int index) async {
     final recording = _recordings[index];
-    final nameController = TextEditingController(
-      text: recording.name ?? '錄音 ${index + 1}',
-    );
+    final oldName = recording.name ?? '錄音 ${index + 1}';
+    final nameController = TextEditingController(text: oldName);
 
     return showDialog<void>(
       context: context,
@@ -394,15 +460,67 @@ class _AddDictationScreenState extends ConsumerState<AddDictationScreen> {
               child: const Text('取消'),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
+                final newName = nameController.text.isNotEmpty
+                    ? nameController.text
+                    : '錄音 ${index + 1}';
+
+                if (newName == oldName) {
+                  Navigator.pop(context);
+                  return;
+                }
+
+                // 檢查錄音名稱是否重複
+                final newKey = _buildRecordingKey(
+                  _categoryNameController.text,
+                  _textbookNameController.text,
+                  newName,
+                );
+
+                for (int i = 0; i < _recordings.length; i++) {
+                  if (i == index) continue;
+                  final otherName = _recordings[i].name ?? '錄音 ${i + 1}';
+                  final otherKey = _buildRecordingKey(
+                    _categoryNameController.text,
+                    _textbookNameController.text,
+                    otherName,
+                  );
+                  if (otherKey == newKey) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('錄音名稱重複，請使用其他名稱')),
+                      );
+                    }
+                    return;
+                  }
+                }
+
+                // 同步重新命名檔案
+                final newFileName =
+                    '${_sanitizeFileName(_categoryNameController.text)}_${_sanitizeFileName(_textbookNameController.text)}_${_sanitizeFileName(newName)}.m4a';
+                final oldFile = File(recording.filePath);
+                final audioDir = oldFile.parent;
+                final newPath = '${audioDir.path}/$newFileName';
+
+                String finalPath = recording.filePath;
+                if (await oldFile.exists()) {
+                  if (oldFile.path != newPath) {
+                    final newFile = File(newPath);
+                    if (await newFile.exists()) {
+                      await newFile.delete();
+                    }
+                    await oldFile.rename(newPath);
+                    finalPath = newPath;
+                  }
+                }
+
                 setState(() {
                   _recordings[index] = _recordings[index].copyWith(
-                    name: nameController.text.isNotEmpty
-                        ? nameController.text
-                        : '錄音 ${index + 1}',
+                    name: newName,
+                    filePath: finalPath,
                   );
                 });
-                Navigator.pop(context);
+                if (context.mounted) Navigator.pop(context);
               },
               child: const Text('確定'),
             ),
@@ -446,155 +564,168 @@ class _AddDictationScreenState extends ConsumerState<AddDictationScreen> {
         ),
         body: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        TextFormField(
-                          controller: _textbookNameController,
-                          decoration: InputDecoration(
-                            labelText: '課本名稱',
-                            hintText: '輸入或選擇課本名稱',
-                            suffixIcon: _textbookNames.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.arrow_drop_down),
-                                    onPressed: _showTextbookSuggestions,
-                                  )
-                                : null,
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return '請輸入課本名稱';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _categoryNameController,
-                          decoration: InputDecoration(
-                            labelText: '類別',
-                            hintText: '輸入或選擇類別',
-                            suffixIcon: _categoryNames.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.arrow_drop_down),
-                                    onPressed: _showCategorySuggestions,
-                                  )
-                                : null,
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return '請輸入類別';
-                            }
-                            return null;
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 300),
-                    child: _recordings.isEmpty
-                        ? const Center(child: Text('暫無錄音'))
-                        : ReorderableListView(
-                            scrollController: _recordingsScrollController,
-                            onReorder: (oldIndex, newIndex) {
-                              setState(() {
-                                if (newIndex > oldIndex) {
-                                  newIndex -= 1;
-                                }
-                                final Recording item = _recordings.removeAt(
-                                  oldIndex,
-                                );
-                                _recordings.insert(newIndex, item);
-                              });
+            padding: const EdgeInsets.only(left: 16.0, top: 16.0, right: 16.0),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Form(
+                      key: _formKey,
+                      child: Column(
+                        children: [
+                          TextFormField(
+                            controller: _textbookNameController,
+                            decoration: InputDecoration(
+                              //labelText: '課本名稱',
+                              label: Text(
+                                '課本名稱',
+                                style: TextStyle(
+                                  color: Colors.purple.shade300, // 改顏色
+                                  fontSize: 18, // 改字體大小
+                                  fontWeight: FontWeight.bold, // 加粗
+                                ),
+                              ),
+                              hintText: '輸入或選擇課本名稱',
+                              suffixIcon: _textbookNames.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.arrow_drop_down),
+                                      onPressed: _showTextbookSuggestions,
+                                    )
+                                  : null,
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return '請輸入課本名稱';
+                              }
+                              return null;
                             },
-                            children: [
-                              for (
-                                int index = 0;
-                                index < _recordings.length;
-                                index++
-                              )
-                                ListTile(
-                                  key: ValueKey(_recordings[index]),
-                                  leading: CircleAvatar(
-                                    backgroundColor: const Color.fromARGB(
-                                      255,
-                                      210,
-                                      117,
-                                      226,
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _categoryNameController,
+                            decoration: InputDecoration(
+                              labelText: '類別',
+                              hintText: '輸入或選擇類別',
+                              suffixIcon: _categoryNames.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.arrow_drop_down),
+                                      onPressed: _showCategorySuggestions,
+                                    )
+                                  : null,
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return '請輸入類別';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 300),
+                      child: _recordings.isEmpty
+                          ? const Center(child: Text('暫無錄音'))
+                          : ReorderableListView(
+                              scrollController: _recordingsScrollController,
+                              onReorder: (oldIndex, newIndex) {
+                                setState(() {
+                                  if (newIndex > oldIndex) {
+                                    newIndex -= 1;
+                                  }
+                                  final Recording item = _recordings.removeAt(
+                                    oldIndex,
+                                  );
+                                  _recordings.insert(newIndex, item);
+                                });
+                              },
+                              children: [
+                                for (
+                                  int index = 0;
+                                  index < _recordings.length;
+                                  index++
+                                )
+                                  ListTile(
+                                    key: ValueKey(_recordings[index]),
+                                    leading: CircleAvatar(
+                                      backgroundColor: const Color.fromARGB(
+                                        255,
+                                        210,
+                                        117,
+                                        226,
+                                      ),
+                                      foregroundColor: Colors.white,
+                                      child: Text('${index + 1}'),
                                     ),
-                                    foregroundColor: Colors.white,
-                                    child: Text('${index + 1}'),
-                                  ),
-                                  title: GestureDetector(
-                                    onTap: () => _editRecordingName(index),
-                                    child: Text(
-                                      _recordings[index].name ??
-                                          '錄音 ${index + 1}',
-                                      style: TextStyle(
-                                        color: Colors.purple.shade300,
-                                        decoration: TextDecoration.underline,
+                                    title: GestureDetector(
+                                      onTap: () => _editRecordingName(index),
+                                      child: Text(
+                                        _recordings[index].name ??
+                                            '錄音 ${index + 1}',
+                                        style: TextStyle(
+                                          color: Colors.purple.shade300,
+                                          decoration: TextDecoration.underline,
+                                        ),
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      '長度: ${_recordings[index].durationSeconds} 秒',
+                                    ),
+                                    trailing: SizedBox(
+                                      width: 100,
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.end,
+                                        children: [
+                                          IconButton(
+                                            icon: Icon(
+                                              (_currentPlayingIndex == index &&
+                                                      _isPlaying)
+                                                  ? Icons.pause_circle
+                                                  : Icons.play_arrow,
+                                            ),
+                                            onPressed: () {
+                                              if (_currentPlayingIndex ==
+                                                      index &&
+                                                  _isPlaying) {
+                                                _stopPlayback();
+                                              } else {
+                                                _playRecording(index);
+                                              }
+                                            },
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.delete),
+                                            onPressed: () {
+                                              setState(() {
+                                                _recordings.removeAt(index);
+                                              });
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    '已刪除錄音 ${index + 1}',
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ),
-                                  subtitle: Text(
-                                    '長度: ${_recordings[index].durationSeconds} 秒',
-                                  ),
-                                  trailing: SizedBox(
-                                    width: 100,
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      children: [
-                                        IconButton(
-                                          icon: Icon(
-                                            (_currentPlayingIndex == index &&
-                                                    _isPlaying)
-                                                ? Icons.pause_circle
-                                                : Icons.play_arrow,
-                                          ),
-                                          onPressed: () {
-                                            if (_currentPlayingIndex == index &&
-                                                _isPlaying) {
-                                              _stopPlayback();
-                                            } else {
-                                              _playRecording(index);
-                                            }
-                                          },
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.delete),
-                                          onPressed: () {
-                                            setState(() {
-                                              _recordings.removeAt(index);
-                                            });
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  '已刪除錄音 ${index + 1}',
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                  ),
-                  const Divider(height: 10),
-                  RecordingWidget(onStop: _onRecordingStopped),
-                  const SizedBox(height: 16),
-                ],
+                              ],
+                            ),
+                    ),
+                    const Divider(height: 10),
+                    RecordingWidget(onStop: _onRecordingStopped),
+                  ],
+                ),
               ),
             ),
           ),
